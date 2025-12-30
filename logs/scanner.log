@@ -1,0 +1,35 @@
+2025-12-29 23:46:30,016 | INFO | Network Security Scanner started
+2025-12-29 23:46:30,024 | INFO | Scan started for target: 127.0.0.1
+2025-12-29 23:46:30,024 | INFO | Scan start time: 2025-12-29 23:46:30
+2025-12-29 23:46:30,028 | INFO | Starting port scan
+2025-12-29 23:46:32,028 | INFO | Detecting services
+2025-12-29 23:47:32,169 | INFO | Analyzing risk
+2025-12-29 23:47:32,169 | INFO | Scan completed at: 2025-12-29 23:47:32
+2025-12-29 23:47:32,169 | INFO | Total scan duration: 62.14 seconds
+2025-12-29 23:47:32,169 | INFO | Generating reports
+2025-12-29 23:47:32,179 | INFO | Scan completed successfully
+2025-12-29 23:47:32,179 | INFO | JSON report saved at: reports/json/127_0_0_1_20251229_234732.json
+2025-12-29 23:47:32,185 | INFO | HTML report saved at: reports/html/127_0_0_1_20251229_234732.html
+2025-12-29 23:47:32,191 | INFO | Logger test: if you see this, logging works
+2025-12-29 23:53:28,173 | INFO | Network Security Scanner started
+2025-12-29 23:53:28,173 | INFO | Scan started for target: 127.0.0.1
+2025-12-29 23:53:28,173 | INFO | Scan start time: 2025-12-29 23:53:28
+2025-12-29 23:53:28,173 | INFO | Starting port scan
+2025-12-29 23:53:30,038 | INFO | Detecting services
+2025-12-29 23:54:30,290 | INFO | Analyzing risk
+2025-12-29 23:54:30,290 | INFO | Scan completed at: 2025-12-29 23:54:30
+2025-12-29 23:54:30,290 | INFO | Total scan duration: 62.12 seconds
+2025-12-29 23:54:30,290 | INFO | Generating reports
+2025-12-29 23:57:27,096 | INFO | Network Security Scanner started
+2025-12-29 23:57:27,107 | INFO | Scan started for target: 127.0.0.1
+2025-12-29 23:57:27,111 | INFO | Scan start time: 2025-12-29 23:57:27
+2025-12-29 23:57:27,111 | INFO | Starting port scan
+2025-12-29 23:57:28,948 | INFO | Detecting services
+2025-12-29 23:58:29,161 | INFO | Analyzing risk
+2025-12-29 23:58:29,161 | INFO | Scan completed at: 2025-12-29 23:58:29
+2025-12-29 23:58:29,161 | INFO | Total scan duration: 62.05 seconds
+2025-12-29 23:58:29,161 | INFO | Generating reports
+2025-12-29 23:58:29,166 | INFO | Scan completed successfully
+2025-12-29 23:58:29,166 | INFO | JSON report saved at: reports/json/127_0_0_1_20251229_235829.json
+2025-12-29 23:58:29,166 | INFO | HTML report saved at: reports/html/127_0_0_1_20251229_235829.html
+2025-12-29 23:58:29,166 | INFO | Logger test: if you see this, logging works
