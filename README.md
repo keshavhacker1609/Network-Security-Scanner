@@ -32,61 +32,18 @@ Report Generation (JSON + HTML)
 ↓
 Logging & Output Storage
 
-yaml
-Copy code
-
----
-
-## 🛠️ Tech Stack
-
 - Python 3
 - Nmap
 - YAML (configuration)
 - HTML / JSON
-- Python logging module
+- Logging module
 
----
-
-## 📁 Project Structure
-
-network_security_scanner/
-│
-├── config/
-│ ├── config.yaml
-│ ├── logger.py
-│ └── init.py
-│
-├── scanner/
-│ ├── port_scanner.py
-│ ├── service_detector.py
-│ ├── risk_analyzer.py
-│ └── report_generator.py
-│
-├── reports/
-│ ├── json/
-│ └── html/
-│
-├── logs/
-│ └── scanner.log
-│
-├── screenshots/
-│ ├── terminal_scan.png
-│ └── html_report.png
-│
-├── main.py
-├── requirements.txt
-└── README.md
-
-yaml
-Copy code
-
----
 
 ## ▶️ Usage
 
 ### Prerequisites
 - Python 3.x
-- Nmap installed and accessible via command line
+- Nmap installed and accessible via CLI
 
 ### Run the scanner
 ```bash
