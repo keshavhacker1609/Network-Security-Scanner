@@ -1,14 +1,8 @@
-import nmap
+# Service detection is now integrated directly into port_scanner.run_scan().
+# A single nmap pass with -sV retrieves both open ports and their service/version
+# details, eliminating the duplicate network round-trip that existed previously.
+#
+# This module is kept for backwards compatibility only.
+# Import run_scan from scanner.port_scanner instead.
 
-def detect_services(target):
-    nm = nmap.PortScanner()
-    nm.scan(target, arguments="-sV")
-
-    services = {}
-    for host in nm.all_hosts():
-        services[host] = []
-        for proto in nm[host].all_protocols():
-            for port in nm[host][proto]:
-                name = nm[host][proto][port]['name']
-                services[host].append((port, name))
-    return services
+from scanner.port_scanner import run_scan  # noqa: F401
