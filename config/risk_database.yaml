@@ -1,0 +1,288 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Modular risk database for well-known ports.
+#
+# This file is loaded and merged by config.yaml via 'risk_database_files'.
+# Add extra YAML files with the same 'risk_database:' top-level key to extend
+# or override entries without editing the base file.
+#
+# Fields per port: service, level (HIGH/MEDIUM/LOW), description, cvss_score,
+#                  cve_examples (optional), remediation.
+# ─────────────────────────────────────────────────────────────────────────────
+
+risk_database:
+  21:
+    service: "FTP"
+    level: "HIGH"
+    description: "FTP transmits credentials and data in cleartext; anonymous login often enabled."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2011-2523", "CVE-1999-0497"]
+    remediation: "Disable FTP. Use SFTP or SCP. If FTP is required, enforce FTPS with TLS."
+
+  22:
+    service: "SSH"
+    level: "MEDIUM"
+    description: "SSH exposed to the internet raises brute-force and credential-stuffing risk."
+    cvss_score: 5.3
+    cve_examples: ["CVE-2023-38408"]
+    remediation: "Restrict access by IP, enforce key-based auth, disable root login, enable fail2ban."
+
+  23:
+    service: "Telnet"
+    level: "HIGH"
+    description: "Telnet transmits all data including credentials in cleartext."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2020-10188"]
+    remediation: "Disable Telnet immediately. Replace with SSH."
+
+  25:
+    service: "SMTP"
+    level: "HIGH"
+    description: "Open SMTP relay enables spam/phishing campaigns and credential exposure."
+    cvss_score: 7.5
+    cve_examples: ["CVE-2020-7247"]
+    remediation: "Require SMTP AUTH, enable TLS, disable open relay, configure SPF/DKIM/DMARC."
+
+  53:
+    service: "DNS"
+    level: "MEDIUM"
+    description: "Open DNS resolver can be abused for amplification DDoS attacks."
+    cvss_score: 6.8
+    cve_examples: ["CVE-2020-1350"]
+    remediation: "Restrict recursive queries to authorised clients only. Apply BIND/Unbound patches."
+
+  80:
+    service: "HTTP"
+    level: "MEDIUM"
+    description: "Unencrypted HTTP exposes all traffic to interception and manipulation."
+    cvss_score: 5.0
+    remediation: "Redirect all HTTP to HTTPS. Implement HSTS with a long max-age."
+
+  110:
+    service: "POP3"
+    level: "HIGH"
+    description: "POP3 transmits email credentials in cleartext."
+    cvss_score: 7.5
+    remediation: "Use POP3S (port 995) with TLS. Disable plain POP3."
+
+  111:
+    service: "RPCBind"
+    level: "HIGH"
+    description: "RPCBind exposes NFS/RPC services and is frequently exploited for privilege escalation."
+    cvss_score: 8.1
+    cve_examples: ["CVE-2017-8779"]
+    remediation: "Block port 111 at the firewall. Disable portmapper if NFS is not required."
+
+  135:
+    service: "MS-RPC"
+    level: "HIGH"
+    description: "Microsoft RPC endpoint mapper is a critical attack surface for Windows hosts."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2003-0352", "CVE-2022-26809"]
+    remediation: "Block from the internet. Apply all Windows security patches immediately."
+
+  139:
+    service: "NetBIOS-SSN"
+    level: "HIGH"
+    description: "NetBIOS-SSN enables SMB sessions and is exploited for lateral movement and NTLM relay."
+    cvss_score: 8.1
+    cve_examples: ["CVE-2017-0143"]
+    remediation: "Disable NetBIOS over TCP/IP. Block ports 137-139 at the perimeter firewall."
+
+  143:
+    service: "IMAP"
+    level: "MEDIUM"
+    description: "IMAP without TLS exposes email content and credentials."
+    cvss_score: 5.9
+    remediation: "Use IMAPS (port 993) with TLS. Disable plain IMAP."
+
+  443:
+    service: "HTTPS"
+    level: "LOW"
+    description: "Encrypted HTTPS — verify TLS version, cipher strength, and certificate validity."
+    cvss_score: 2.0
+    remediation: "Enforce TLS 1.2+, disable TLS 1.0/1.1 and RC4. Keep certificates rotated."
+
+  445:
+    service: "SMB"
+    level: "HIGH"
+    description: "SMB is critically vulnerable to EternalBlue/WannaCry and PrintNightmare."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2017-0144", "CVE-2020-0796", "CVE-2021-34527"]
+    remediation: "Block from internet immediately. Apply MS17-010. Disable SMBv1. Enable SMB signing."
+
+  512:
+    service: "rexec"
+    level: "HIGH"
+    description: "Remote execution service sends credentials in cleartext."
+    cvss_score: 9.8
+    remediation: "Disable rexec immediately. Replace with SSH."
+
+  513:
+    service: "rlogin"
+    level: "HIGH"
+    description: "Remote login uses trust-based authentication and is trivially exploitable."
+    cvss_score: 9.8
+    remediation: "Disable rlogin immediately. Replace with SSH."
+
+  514:
+    service: "rsh"
+    level: "HIGH"
+    description: "Remote shell allows unauthenticated execution via .rhosts trust."
+    cvss_score: 9.8
+    remediation: "Disable rsh immediately. Replace with SSH."
+
+  587:
+    service: "SMTP Submission"
+    level: "MEDIUM"
+    description: "SMTP submission port — ensure STARTTLS and AUTH are enforced."
+    cvss_score: 5.0
+    remediation: "Require STARTTLS and SMTP AUTH. Rate-limit authentication attempts."
+
+  993:
+    service: "IMAPS"
+    level: "LOW"
+    description: "Encrypted IMAP over TLS. Verify cipher configuration."
+    cvss_score: 2.0
+    remediation: "Enforce TLS 1.2+. Use strong cipher suites. Renew certificates before expiry."
+
+  995:
+    service: "POP3S"
+    level: "LOW"
+    description: "Encrypted POP3 over TLS. Verify cipher configuration."
+    cvss_score: 2.0
+    remediation: "Enforce TLS 1.2+. Use strong cipher suites."
+
+  1433:
+    service: "MSSQL"
+    level: "HIGH"
+    description: "Microsoft SQL Server must never be directly exposed to the internet."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2020-0618"]
+    remediation: "Restrict to application subnets. Use Windows Auth. Enforce TLS. Audit sa accounts."
+
+  1521:
+    service: "Oracle DB"
+    level: "HIGH"
+    description: "Oracle database listener should never be internet-facing."
+    cvss_score: 9.8
+    remediation: "Restrict with firewall. Use VPN for remote access. Disable default accounts."
+
+  1723:
+    service: "PPTP VPN"
+    level: "MEDIUM"
+    description: "PPTP has known cryptographic weaknesses — MS-CHAPv2 is broken."
+    cvss_score: 6.8
+    remediation: "Replace PPTP with IKEv2, OpenVPN, or WireGuard."
+
+  2375:
+    service: "Docker API (unauthenticated)"
+    level: "HIGH"
+    description: "Unauthenticated Docker daemon allows full container escape to host root."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2019-5736"]
+    remediation: "Never expose Docker API publicly. Use TLS client certificates if remote access is needed."
+
+  2376:
+    service: "Docker TLS API"
+    level: "MEDIUM"
+    description: "Docker API with TLS — verify mutual authentication is properly configured."
+    cvss_score: 5.0
+    remediation: "Enforce mutual TLS. Restrict access by source IP."
+
+  3306:
+    service: "MySQL"
+    level: "HIGH"
+    description: "MySQL should not be exposed to the internet."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2012-2122"]
+    remediation: "Bind to 127.0.0.1. Use SSH tunnels for remote access. Remove anonymous accounts."
+
+  3389:
+    service: "RDP"
+    level: "HIGH"
+    description: "RDP is the primary vector for ransomware deployment and brute-force attacks."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2019-0708", "CVE-2020-0609", "CVE-2019-1182"]
+    remediation: "Block from internet. Use VPN gateway. Enable NLA. Change default port. Patch BlueKeep."
+
+  4444:
+    service: "Metasploit Default Handler"
+    level: "HIGH"
+    description: "Default Metasploit handler port — indicates active attack infrastructure or compromise."
+    cvss_score: 10.0
+    remediation: "Immediately investigate for active intrusion. Isolate the host. Engage incident response."
+
+  5432:
+    service: "PostgreSQL"
+    level: "HIGH"
+    description: "PostgreSQL should not be directly accessible from the internet."
+    cvss_score: 9.8
+    remediation: "Bind to localhost. Use SSL. Restrict pg_hba.conf to application server IPs only."
+
+  5900:
+    service: "VNC"
+    level: "HIGH"
+    description: "VNC commonly has no authentication or uses weak passwords; screen data is unencrypted."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2019-15681", "CVE-2023-26369"]
+    remediation: "Disable public access. Use VPN. Enforce strong password or certificate-based auth."
+
+  6379:
+    service: "Redis"
+    level: "HIGH"
+    description: "Unauthenticated Redis allows arbitrary data access and RCE via SLAVEOF/CONFIG."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2022-0543", "CVE-2023-28425"]
+    remediation: "Bind to 127.0.0.1. Set requirepass. Rename or disable SLAVEOF, CONFIG, DEBUG."
+
+  8080:
+    service: "HTTP Alternate"
+    level: "MEDIUM"
+    description: "Alternate HTTP — often an admin panel, proxy, or dev server without auth."
+    cvss_score: 5.0
+    remediation: "Enforce HTTPS. Add authentication. Restrict by IP if this is an admin interface."
+
+  8443:
+    service: "HTTPS Alternate"
+    level: "LOW"
+    description: "Alternate HTTPS port. Verify TLS configuration and certificate validity."
+    cvss_score: 2.0
+    remediation: "Enforce TLS 1.2+. Use strong cipher suites."
+
+  8888:
+    service: "Jupyter Notebook"
+    level: "HIGH"
+    description: "Jupyter Notebook without authentication grants arbitrary code execution."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2022-24758"]
+    remediation: "Enable token/password auth. Bind to localhost. Use a reverse proxy with TLS."
+
+  9200:
+    service: "Elasticsearch HTTP"
+    level: "HIGH"
+    description: "Elasticsearch without auth exposes all indexed data to anyone on the network."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2015-1427"]
+    remediation: "Enable X-Pack Security. Bind to internal interface. Require TLS."
+
+  9300:
+    service: "Elasticsearch Cluster"
+    level: "HIGH"
+    description: "Elasticsearch cluster transport port — internal use only, never expose publicly."
+    cvss_score: 9.8
+    remediation: "Restrict to cluster nodes with firewall rules. Never expose to internet."
+
+  27017:
+    service: "MongoDB"
+    level: "HIGH"
+    description: "MongoDB without auth exposes all databases — a leading cause of large-scale breaches."
+    cvss_score: 9.8
+    cve_examples: ["CVE-2021-32036"]
+    remediation: "Enable --auth. Bind to internal interface. Use TLS. Audit roles and users."
+
+  27018:
+    service: "MongoDB Shard"
+    level: "HIGH"
+    description: "MongoDB shard server — internal cluster port, never expose publicly."
+    cvss_score: 9.8
+    remediation: "Restrict to cluster nodes only. Enforce authentication and TLS."

@@ -3,6 +3,8 @@ Report generator: produces a structured JSON file and a self-contained,
 dark-themed HTML report from enriched scan results.
 """
 
+import csv
+import io
 import json
 import os
 import logging
@@ -10,6 +12,9 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 logger = logging.getLogger("NetworkSecurityScanner")
+
+# SARIF level mapping so results can be uploaded to GitHub code-scanning etc.
+_SARIF_LEVEL = {"HIGH": "error", "MEDIUM": "warning", "LOW": "note"}
 
 _RISK_BADGE = {
     "HIGH":   '<span class="badge badge-high">HIGH</span>',
@@ -49,25 +54,179 @@ def generate_reports(
     safe_target = target.replace("/", "_").replace(".", "_").replace(":", "_")
     paths: Dict[str, str] = {}
 
-    if "json" in formats:
-        json_dir = os.path.join(output_dir, "json")
-        os.makedirs(json_dir, exist_ok=True)
-        json_path = os.path.join(json_dir, f"{safe_target}_{scan_id}.json")
-        with open(json_path, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=2, default=str)
-        logger.debug(f"JSON report written: {json_path}")
-        paths["json"] = json_path
+    # format name -> (subdir, extension, renderer producing a string, json_dump?)
+    renderers = {
+        "json":     ("json",     "json", None,                        True),
+        "html":     ("html",     "html", lambda: _render_html(data, target),   False),
+        "csv":      ("csv",      "csv",  lambda: _render_csv(data),            False),
+        "markdown": ("markdown", "md",   lambda: _render_markdown(data, target), False),
+        "sarif":    ("sarif",    "sarif", lambda: _render_sarif(data),         False),
+    }
 
-    if "html" in formats:
-        html_dir = os.path.join(output_dir, "html")
-        os.makedirs(html_dir, exist_ok=True)
-        html_path = os.path.join(html_dir, f"{safe_target}_{scan_id}.html")
-        with open(html_path, "w", encoding="utf-8") as fh:
-            fh.write(_render_html(data, target))
-        logger.debug(f"HTML report written: {html_path}")
-        paths["html"] = html_path
+    for fmt in formats:
+        spec = renderers.get(fmt)
+        if spec is None:
+            logger.warning(f"Unknown report format '{fmt}' — skipped.")
+            continue
+        subdir, ext, render, is_json = spec
+        out_dir = os.path.join(output_dir, subdir)
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, f"{safe_target}_{scan_id}.{ext}")
+        with open(out_path, "w", encoding="utf-8", newline="") as fh:
+            if is_json:
+                json.dump(data, fh, indent=2, default=str)
+            else:
+                fh.write(render())
+        logger.debug(f"{fmt.upper()} report written: {out_path}")
+        paths[fmt] = out_path
 
     return paths
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CSV / Markdown / SARIF renderers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _iter_findings(data: Dict[str, Any]):
+    """Yield (host, host_data, finding) triples across all hosts."""
+    for host, hd in data.get("results", {}).items():
+        for f in hd.get("findings", []):
+            yield host, hd, f
+
+
+def _render_csv(data: Dict[str, Any]) -> str:
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "host", "hostname", "port", "protocol", "service", "product",
+        "version", "risk_level", "cvss_score", "cve_examples", "remediation",
+    ])
+    for host, hd, f in _iter_findings(data):
+        writer.writerow([
+            host,
+            hd.get("hostname", host),
+            f.get("port", ""),
+            f.get("protocol", ""),
+            f.get("service", ""),
+            f.get("product", ""),
+            f.get("version", ""),
+            f.get("risk_level", ""),
+            f.get("cvss_score", ""),
+            "; ".join(f.get("cve_examples", []) or []),
+            f.get("remediation", ""),
+        ])
+    return buf.getvalue()
+
+
+def _render_markdown(data: Dict[str, Any], target: str) -> str:
+    s = data.get("summary", {})
+    lines: List[str] = [
+        f"# Network Security Scan Report — `{target}`",
+        "",
+        f"- **Scan ID:** {data.get('scan_id', '—')}",
+        f"- **Scan type:** {data.get('scan_type', '—')}",
+        f"- **Ports:** {data.get('port_spec', '—')}",
+        f"- **Started:** {data.get('scan_start', '—')}  ·  **Ended:** {data.get('scan_end', '—')}",
+        f"- **Duration:** {data.get('scan_duration_seconds', 0)} s",
+        f"- **Scanner:** v{data.get('scanner_version', '—')}",
+        "",
+        "## Summary",
+        "",
+        f"| Hosts | Open ports | High | Medium | Low |",
+        f"|------:|-----------:|-----:|-------:|----:|",
+        f"| {s.get('hosts', 0)} | {s.get('total_open_ports', 0)} | "
+        f"{s.get('high', 0)} | {s.get('medium', 0)} | {s.get('low', 0)} |",
+        "",
+    ]
+
+    for host, hd in data.get("results", {}).items():
+        score = hd.get("risk_score", {})
+        hostname = hd.get("hostname", host)
+        title = host if hostname == host else f"{host} ({hostname})"
+        lines.append(f"## Host `{title}` — score {score.get('score', 0)}/100 ({score.get('grade', 'LOW')})")
+        lines.append("")
+        findings = hd.get("findings", [])
+        if not findings:
+            lines.append("_No open ports detected._\n")
+            continue
+        lines.append("| Port | Service | Risk | CVSS | CVE | Remediation |")
+        lines.append("|------|---------|------|-----:|-----|-------------|")
+        for f in findings:
+            ver = f"{f.get('product', '')} {f.get('version', '')}".strip()
+            svc = f.get("service", "") + (f" ({ver})" if ver else "")
+            cves = ", ".join(f.get("cve_examples", []) or []) or "—"
+            lines.append(
+                f"| {f.get('port')}/{f.get('protocol', 'tcp').upper()} "
+                f"| {svc} | {f.get('risk_level', 'LOW')} | {f.get('cvss_score', 0)} "
+                f"| {cves} | {f.get('remediation', '')} |"
+            )
+        lines.append("")
+
+    lines.append("---")
+    lines.append("_For authorised security assessment use only._")
+    return "\n".join(lines)
+
+
+def _render_sarif(data: Dict[str, Any]) -> str:
+    """Static Analysis Results Interchange Format 2.1.0 (GitHub code-scanning)."""
+    rules: Dict[str, Any] = {}
+    results: List[Dict[str, Any]] = []
+
+    for host, hd, f in _iter_findings(data):
+        port = f.get("port")
+        proto = f.get("protocol", "tcp")
+        rule_id = f"open-port-{proto}-{port}"
+
+        if rule_id not in rules:
+            rules[rule_id] = {
+                "id": rule_id,
+                "name": f"OpenPort{port}",
+                "shortDescription": {"text": f"{f.get('service', 'service')} on port {port}/{proto}"},
+                "fullDescription": {"text": f.get("risk_description", "") or "Open network port."},
+                "defaultConfiguration": {"level": _SARIF_LEVEL.get(f.get("risk_level", "LOW"), "note")},
+                "properties": {
+                    "security-severity": str(f.get("cvss_score", 0.0) or 0.0),
+                    "tags": ["security", "network", f.get("risk_level", "LOW").lower()],
+                },
+            }
+
+        results.append({
+            "ruleId": rule_id,
+            "level": _SARIF_LEVEL.get(f.get("risk_level", "LOW"), "note"),
+            "message": {
+                "text": (
+                    f"{f.get('risk_level', 'LOW')} risk — {f.get('service', 'unknown')} "
+                    f"open on {host}:{port}/{proto}. {f.get('remediation', '')}"
+                ).strip()
+            },
+            "locations": [{
+                "physicalLocation": {
+                    "artifactLocation": {"uri": f"network://{host}/{proto}/{port}"}
+                }
+            }],
+            "properties": {
+                "host": host,
+                "port": port,
+                "cve_examples": f.get("cve_examples", []) or [],
+            },
+        })
+
+    sarif = {
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "Network Security Scanner",
+                    "version": data.get("scanner_version", "2.0.0"),
+                    "informationUri": "https://github.com/keshavhacker1609/Network-Security-Scanner",
+                    "rules": list(rules.values()),
+                }
+            },
+            "results": results,
+        }],
+    }
+    return json.dumps(sarif, indent=2, default=str)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

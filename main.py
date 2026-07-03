@@ -24,9 +24,36 @@ from scanner.validator import validate_target, validate_ports
 from scanner.port_scanner import run_scan, SCAN_PROFILES
 from scanner.risk_analyzer import analyze_risks
 from scanner.report_generator import generate_reports
+from scanner import history as scan_history
 
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
+
+ALL_FORMATS = ["json", "html", "csv", "markdown", "sarif"]
+
+# Severity ranking used by --fail-on gating (higher = worse).
+_SEVERITY_RANK = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+
+
+def _resolve_formats(cli_format, config) -> list:
+    """Expand the (possibly repeated) --format flag, honouring config defaults."""
+    if not cli_format:
+        chosen = config.output.get("default_formats", ["json", "html"])
+    else:
+        chosen = cli_format
+
+    resolved: list = []
+    for fmt in chosen:
+        if fmt == "all":
+            resolved.extend(ALL_FORMATS)
+        elif fmt == "both":
+            resolved.extend(["json", "html"])
+        else:
+            resolved.append(fmt)
+
+    # De-duplicate while preserving order.
+    seen = set()
+    return [f for f in resolved if not (f in seen or seen.add(f))]
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -42,9 +69,9 @@ scan types:
   stealth     Top 1000 ports, slow SYN scan (-T2)
 
 exit codes:
-  0  Clean — no high-risk findings
+  0  Clean — no findings at or above the --fail-on threshold
   1  Error — scan or config failure
-  2  Warning — one or more HIGH-risk ports found
+  2  Gate  — a finding at or above the --fail-on threshold was found
   130 Interrupted (Ctrl-C)
         """,
     )
@@ -80,14 +107,36 @@ exit codes:
     )
     out_group.add_argument(
         "--format", "-f",
-        choices=["json", "html", "both"],
-        default="both",
-        help="Report format (default: both).",
+        choices=["json", "html", "csv", "markdown", "sarif", "both", "all"],
+        action="append",
+        default=None,
+        help="Report format. 'both' = json+html, 'all' = every format. "
+             "Repeat to combine (e.g. -f json -f sarif). Default: config's output.default_formats.",
     )
     out_group.add_argument(
         "--no-report",
         action="store_true",
         help="Skip writing report files; print summary to console only.",
+    )
+
+    monitor_group = parser.add_argument_group("monitoring options")
+    monitor_group.add_argument(
+        "--diff",
+        action="store_true",
+        help="Compare this scan against the previous scan of the same target and report changes.",
+    )
+    monitor_group.add_argument(
+        "--no-history",
+        action="store_true",
+        help="Do not persist a scan snapshot for later diffing.",
+    )
+    monitor_group.add_argument(
+        "--fail-on",
+        choices=["none", "low", "medium", "high", "critical"],
+        default=None,
+        metavar="LEVEL",
+        help="Exit non-zero (code 2) when a finding at or above LEVEL is present. "
+             "Overrides config's ci.fail_on.",
     )
 
     misc_group = parser.add_argument_group("miscellaneous")
@@ -206,9 +255,7 @@ def main() -> int:
     # ── Resolve runtime settings ──────────────────────────────
     timeout    = args.timeout or config.scanner.get("timeout", 300)
     output_dir = args.output_dir or config.output.get("reports_dir", "reports")
-    formats    = ["both"] if args.format == "both" else [args.format]
-    if "both" in formats:
-        formats = ["json", "html"]
+    formats    = _resolve_formats(args.format, config)
 
     scan_id         = datetime.now().strftime("%Y%m%d_%H%M%S")
     scan_start      = datetime.now()
@@ -267,6 +314,26 @@ def main() -> int:
     # ── Console summary ───────────────────────────────────────
     _print_console_summary(report_data, logger)
 
+    # ── History & diff ────────────────────────────────────────
+    hist_cfg     = config.history
+    hist_enabled = hist_cfg.get("enabled", True)
+    hist_dir     = hist_cfg.get("dir", "logs/history")
+
+    if args.diff and hist_enabled:
+        previous = scan_history.load_previous(hist_dir, args.target)
+        if previous is None:
+            logger.info("No previous scan on record for this target — nothing to diff.")
+        else:
+            diff_result = scan_history.diff(previous, report_data)
+            report_data["diff"] = diff_result
+            scan_history.log_diff(diff_result)
+
+    if hist_enabled and not args.no_history:
+        try:
+            scan_history.save_snapshot(hist_dir, report_data)
+        except OSError as exc:
+            logger.warning(f"Could not save scan snapshot: {exc}")
+
     # ── Write reports ─────────────────────────────────────────
     if not args.no_report:
         try:
@@ -283,13 +350,33 @@ def main() -> int:
             logger.error(f"Failed to write reports: {exc}")
             return 1
 
-    # ── Exit code reflects overall risk ──────────────────────
-    high_count = report_data["summary"]["high"]
-    if high_count:
-        logger.warning(f"{high_count} HIGH-risk port(s) detected — review the report immediately.")
+    # ── Exit code reflects overall risk (CI gating) ──────────
+    fail_on = (args.fail_on or config.ci.get("fail_on", "high")).lower()
+    threshold = _SEVERITY_RANK.get(fail_on, 3)
+    summary = report_data["summary"]
+
+    # Highest severity actually observed in this scan.
+    if summary["high"]:
+        observed = _SEVERITY_RANK["high"]
+        observed_label = "HIGH"
+    elif summary["medium"]:
+        observed = _SEVERITY_RANK["medium"]
+        observed_label = "MEDIUM"
+    elif summary["low"]:
+        observed = _SEVERITY_RANK["low"]
+        observed_label = "LOW"
+    else:
+        observed = _SEVERITY_RANK["none"]
+        observed_label = "NONE"
+
+    if threshold != _SEVERITY_RANK["none"] and observed >= threshold:
+        logger.warning(
+            f"Findings at or above '{fail_on}' threshold detected "
+            f"(highest observed: {observed_label}) — failing with exit code 2."
+        )
         return 2
 
-    logger.info("Scan finished cleanly — no high-risk findings.")
+    logger.info(f"Scan finished cleanly — no findings at or above '{fail_on}' threshold.")
     return 0
 
 
