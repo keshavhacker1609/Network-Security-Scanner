@@ -26,6 +26,14 @@ def validate_target(target: str) -> Tuple[bool, str]:
     if not target:
         return False, "Target must not be empty."
 
+    # Plain IP address (v4 or v6) — checked first so a bare address is not
+    # mislabelled as a CIDR range (it parses as a valid /32 or /128 network).
+    try:
+        ipaddress.ip_address(target)
+        return True, "ip"
+    except ValueError:
+        pass
+
     # CIDR range
     try:
         net = ipaddress.ip_network(target, strict=False)
@@ -35,13 +43,6 @@ def validate_target(target: str) -> Tuple[bool, str]:
                 "Narrow the range to /16 or smaller."
             )
         return True, "cidr"
-    except ValueError:
-        pass
-
-    # Plain IP address (v4 or v6)
-    try:
-        ipaddress.ip_address(target)
-        return True, "ip"
     except ValueError:
         pass
 

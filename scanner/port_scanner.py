@@ -6,9 +6,23 @@ and optional OS fingerprinting in one network round-trip.
 import logging
 from typing import Any, Dict, Optional
 
-import nmap
-
 logger = logging.getLogger("NetworkSecurityScanner")
+
+
+def _import_nmap():
+    """Import python-nmap lazily so the package loads without it installed.
+
+    Keeps import-time cheap and gives a precise, actionable error only when a
+    scan is actually attempted.
+    """
+    try:
+        import nmap
+        return nmap
+    except ImportError as exc:  # pragma: no cover - environment dependent
+        raise RuntimeError(
+            "The 'python-nmap' package is not installed. "
+            "Install dependencies with: pip install -r requirements.txt"
+        ) from exc
 
 # Scan profiles: name → nmap argument string
 SCAN_PROFILES: Dict[str, str] = {
@@ -60,6 +74,7 @@ def run_scan(
     if extra_args:
         arguments = f"{arguments} {extra_args}"
 
+    nmap = _import_nmap()
     nm = nmap.PortScanner()
 
     logger.debug(f"nmap arguments: {arguments}")
@@ -111,7 +126,7 @@ def run_scan(
     return results
 
 
-def _extract_os(nm: nmap.PortScanner, host: str) -> Dict[str, Any]:
+def _extract_os(nm: Any, host: str) -> Dict[str, Any]:
     os_info: Dict[str, Any] = {"guessed": "Unknown", "matches": []}
     try:
         for match in nm[host].get("osmatch", [])[:3]:
